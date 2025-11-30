@@ -1,0 +1,36 @@
+{
+  "run_timestamp_utc": "string (ISO-8601, UTC)",
+  "flights": [
+    {
+      "inputs_from": "string (IATA)",
+      "inputs_to": "string (IATA)",
+      "program": "string",
+      "departure_date": "string (YYYY-MM-DD)",
+      "duration": "string (e.g., \"23h 55m\") or null",
+      "class": "string (Economy|Premium|Business|First|etc.) or null",
+      "stops": "integer or null",
+      "flight_number": "string (e.g., \"AA142\") or null",
+      "last_updated": "string (ISO-8601 UTC) or null",
+      "legs": [
+        {
+          "leg_departure_datetime": "string (ISO-8601) or null",
+          "leg_arrival_datetime": "string (ISO-8601) or null",
+          "leg_flight_number": "string or null",
+          "leg_distance": "number (miles) or null",
+          "leg_airplane": "string or null",
+          "leg_class": "string or null"
+        }
+      ],
+      "pricing": {
+        "points_price_raw": "string or null",
+        "points_amount": "number or null",
+        "points_program_currency": "string or null",
+        "cash_copay_raw": "string or null",
+        "cash_copay_amount": "number or null",
+        "cash_copay_currency": "string or null",
+        "cents_per_point": "number or null",
+        "total_value_usd": "number or null"
+      }
+    }
+  ]
+}
