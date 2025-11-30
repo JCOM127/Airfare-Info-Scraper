@@ -25,14 +25,14 @@ This project implements an ETL (Extract-Transform-Load) pipeline for flight rewa
 
 ### Features
 
-- ✅ Browser automation with Playwright for JavaScript-rendered content
-- ✅ Network request interception to capture flight APIs
-- ✅ Configuration-driven (no code changes needed)
-- ✅ JSON Schema data contracts for data quality
-- ✅ Comprehensive logging and error handling
-- ✅ Unit tests with pytest
-- ✅ CI/CD with GitHub Actions
-- ✅ Multiple Google Drive authentication modes
+- Browser automation with Playwright for JavaScript-rendered content
+- Network request interception to capture flight APIs
+- Configuration-driven (no code changes needed)
+- JSON Schema data contracts for data quality
+- Comprehensive logging and error handling
+- Unit tests with pytest
+- CI/CD with GitHub Actions
+- Multiple Google Drive authentication modes
 
 ---
 
@@ -95,11 +95,11 @@ Configure your search parameters in `config/config.json`:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `routes` | Array | ✓ | List of flight routes to search |
-| `routes[].origin` | String | ✓ | Departure airport (IATA code) |
-| `routes[].destination` | String | ✓ | Arrival airport (IATA code) |
-| `routes[].programs` | Array | ✓ | Loyalty programs to search |
-| `default_programs` | Array | ✓ | Programs used if route doesn't specify |
+| `routes` | Array | Required | List of flight routes to search |
+| `routes[].origin` | String | Required | Departure airport (IATA code) |
+| `routes[].destination` | String | Required | Arrival airport (IATA code) |
+| `routes[].programs` | Array | Required | Loyalty programs to search |
+| `default_programs` | Array | Required | Programs used if route doesn't specify |
 | `search_window_days` | Integer | Optional | Days ahead to search (default: 60) |
 | `departure_date` | String | Optional | Start date (YYYY-MM-DD format) |
 | `max_offers_per_route` | Integer | Optional | Max offers per route (default: 20, caps API load) |
@@ -424,10 +424,10 @@ GitHub Actions automatically runs tests on every push and pull request.
 **Workflow file:** `.github/workflows/ci.yml`
 
 **What happens:**
-1. ✅ Runs all unit tests with pytest
-2. ✅ Validates code quality
-3. ✅ Checks configuration schema
-4. ❌ Fails if any test doesn't pass (prevents broken code)
+1. Runs all unit tests with pytest
+2. Validates code quality
+3. Checks configuration schema
+4. Fails if any test doesn't pass (prevents broken code)
 
 ### View CI/CD Results
 
