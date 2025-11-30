@@ -1,10 +1,23 @@
+"""
+Flight availability scraper for Seats.aero.
+
+This module handles extraction of flight rewards data from Seats.aero using
+Playwright browser automation and network request interception.
+
+Core functionality:
+- Browser automation with Playwright (Chromium)
+- API request interception and JSON parsing
+- Retry logic with exponential backoff for transient failures
+- Rate limit handling (429 errors)
+- Comprehensive logging with route-level statistics
+"""
+
 import asyncio
 import sys
 import json
 import random
-import random
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from playwright.async_api import async_playwright
 
@@ -15,22 +28,69 @@ logger = setup_logger(__name__)
 
 
 class SeatsAeroScraper:
-    def __init__(self, config: AppConfig):
+    """
+    Scrapes flight availability from Seats.aero.
+    
+    Uses Playwright to launch a headless browser and intercepts API requests
+    to extract flight rewards data. Handles rate limiting, retries, and errors.
+    """
+    
+    def __init__(self, config: AppConfig) -> None:
+        """
+        Initialize scraper with configuration.
+        
+        Args:
+            config (AppConfig): Configuration with routes, programs, settings
+        
+        Attributes:
+            config (AppConfig): Application configuration
+            run_timestamp (str): ISO 8601 timestamp of this scraping run
+            output_schema (Dict): Output data structure with metadata
+        """
         self.config = config
         self.run_timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        self.output_schema = {
+        self.output_schema: Dict[str, any] = {
             "run_timestamp_utc": self.run_timestamp,
             "origin_dest_pairs": [],
         }
 
     def _program_matches(self, source: str, configured: List[str]) -> bool:
+        """
+        Check if program source matches any configured programs.
+        
+        Case-insensitive matching. Allows partial matches to handle variations.
+        
+        Args:
+            source (str): Program name from Seats.aero API
+            configured (List[str]): List of configured program names
+        
+        Returns:
+            bool: True if program matches configuration
+        
+        Example:
+            >>> self._program_matches("AAdvantage", ["AAC", "AAdvantage"])
+            True
+        """
         src = (source or "").lower()
         for p in configured:
             if p.lower() in src or src in p.lower():
                 return True
         return False
 
-    def _format_duration(self, minutes_val):
+    def _format_duration(self, minutes_val: Optional[int]) -> Optional[str]:
+        """
+        Convert minutes to human-readable duration format.
+        
+        Args:
+            minutes_val (Optional[int]): Duration in minutes
+        
+        Returns:
+            Optional[str]: Formatted as "Xh Ym" or None if invalid
+        
+        Example:
+            >>> self._format_duration(90)
+            '1h 30m'
+        """
         if minutes_val is None:
             return None
         try:
@@ -41,15 +101,36 @@ class SeatsAeroScraper:
         except Exception:
             return None
 
-    def _last_updated_ts(self, minutes_ago: int):
+    def _last_updated_ts(self, minutes_ago: int) -> str:
+        """
+        Calculate timestamp for last update based on minutes ago.
+        
+        Args:
+            minutes_ago (int): Number of minutes in the past
+        
+        Returns:
+            str: ISO 8601 formatted datetime string
+        """
         try:
             dt = datetime.now(timezone.utc) - timedelta(minutes=int(minutes_ago))
             return dt.isoformat()
         except Exception:
             return self.run_timestamp
 
-    def _build_minimal_record(self, meta: Dict, target_date: str):
-        """Fallback record when enrichment fails (captures top-level fields only)."""
+    def _build_minimal_record(self, meta: Dict, target_date: str) -> Dict:
+        """
+        Build minimal fallback record when enrichment fails.
+        
+        Captures top-level fields only when detailed enrichment API fails.
+        Used to prevent data loss during rate limiting or API errors.
+        
+        Args:
+            meta (Dict): Metadata from search response
+            target_date (str): Target departure date
+        
+        Returns:
+            Dict: Minimal flight record with basic fields
+        """
         return {
             "inputs_from": meta.get("oa"),
             "inputs_to": meta.get("da"),
@@ -73,8 +154,24 @@ class SeatsAeroScraper:
             },
         }
 
-    async def _page_fetch_json(self, page, url: str, params: Dict):
-        payload = {
+    async def _page_fetch_json(self, page, url: str, params: Dict) -> Dict:
+        """
+        Execute fetch request via browser and return parsed JSON.
+        
+        Implements retry logic with exponential backoff.
+        Handles rate limiting (429 errors) specially.
+        
+        Args:
+            page: Playwright page object
+            url (str): API endpoint URL
+            params (Dict): Query parameters
+        
+        Returns:
+            Dict: Parsed JSON response
+        
+        Raises:
+            Exception: If fetch fails after all retries
+        """
             "url": url,
             "params": params,
             "timeout": self.config.scraping_settings.timeout_ms,
@@ -112,8 +209,20 @@ class SeatsAeroScraper:
                 continue
             raise Exception(f"fetch {url} returned {result['status']}")
 
-    async def _fetch_search(self, page, route: RouteConfig, target_date: str):
-        params = {
+    async def _fetch_search(self, page, route: RouteConfig, target_date: str) -> List[Dict]:
+        """
+        Fetch search results from Seats.aero API.
+        
+        Retrieves available flight offers for a given route and date.
+        
+        Args:
+            page: Playwright page object
+            route (RouteConfig): Route configuration with origin, destination, programs
+            target_date (str): Target departure date (YYYY-MM-DD)
+        
+        Returns:
+            List[Dict]: Metadata array of available offers
+        """
             "min_seats": 1,
             "applicable_cabin": "any",
             "additional_days": "true",
@@ -130,8 +239,21 @@ class SeatsAeroScraper:
         data = await self._page_fetch_json(page, url, params)
         return data.get("metadata", [])
 
-    async def _fetch_enrichment(self, page, availability_id: str, route: RouteConfig, target_date: str):
-        params = {
+    async def _fetch_enrichment(self, page, availability_id: str, route: RouteConfig, target_date: str) -> Dict:
+        """
+        Fetch detailed enrichment data for a specific offer.
+        
+        Gets full flight details including legs, pricing, and cabin information.
+        
+        Args:
+            page: Playwright page object
+            availability_id (str): Unique ID of the offer to enrich
+            route (RouteConfig): Route configuration
+            target_date (str): Target departure date
+        
+        Returns:
+            Dict: Enriched offer details with trip information
+        """
             "m": 1,
             "min_seats": 1,
             "applicable_cabin": "any",
@@ -147,7 +269,19 @@ class SeatsAeroScraper:
         return await self._page_fetch_json(page, url, params)
 
     def _build_records(self, meta: Dict, detail: Dict) -> List[Dict]:
-        program = detail.get("source") or meta.get("source")
+        """
+        Build complete flight records from search metadata and enriched details.
+        
+        Transforms raw API response into normalized flight records.
+        Handles pricing, duration, and leg information.
+        
+        Args:
+            meta (Dict): Metadata from search response
+            detail (Dict): Enriched detail from enrichment API
+        
+        Returns:
+            List[Dict]: List of flight records with full information
+        """
         date = meta.get("date") or detail.get("departureDate")
         dep_air = detail.get("originAirport") or meta.get("oa")
         arr_air = detail.get("destinationAirport") or meta.get("da")
@@ -221,8 +355,26 @@ class SeatsAeroScraper:
             records.append(record)
         return records
 
-    async def run(self):
-        logger.info(f"Starting Scraper Run ({self.run_timestamp})")
+    async def run(self) -> Dict:
+        """
+        Execute the main scraping pipeline.
+        
+        Launches browser, iterates through configured routes, fetches search results,
+        enriches each offer with details, and saves output.
+        
+        Returns:
+            Dict: Complete output schema with all scraped records
+        
+        Process:
+            1. Launch Playwright browser
+            2. For each configured route:
+               a. Fetch search results (metadata)
+               b. Filter by configured programs
+               c. Enrich each result with details
+               d. Build complete records
+            3. Save timestamped JSON output
+            4. Log summary statistics
+        """
         timeout_ms = self.config.scraping_settings.timeout_ms
 
         async with async_playwright() as p:

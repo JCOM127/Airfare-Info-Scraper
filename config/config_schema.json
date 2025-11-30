@@ -1,37 +1,106 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "SeatsAeroConfig",
+  "title": "Fly TCOMA Scraper Configuration Schema",
+  "description": "Configuration schema for flight rewards scraper. Validates config.json structure.",
   "type": "object",
   "required": ["project_name", "env", "default_programs", "scraping_settings", "routes"],
   "properties": {
-    "project_name": { "type": "string" },
-    "env": { "type": "string" },
-    "default_programs": { "type": "array", "items": { "type": "string" } },
+    "project_name": {
+      "type": "string",
+      "description": "Project identifier (e.g., 'Seats.aero Scraper')"
+    },
+    "env": {
+      "type": "string",
+      "description": "Environment: dev, staging, or production",
+      "enum": ["dev", "staging", "production"]
+    },
+    "default_programs": {
+      "type": "array",
+      "description": "Default loyalty programs used if route doesn't specify",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
     "scraping_settings": {
       "type": "object",
-      "required": ["headless", "timeout_ms", "user_agent", "retries", "search_window_days", "departure_date", "max_offers_per_route"],
+      "description": "Configuration for scraper behavior and performance",
+      "required": ["headless", "timeout_ms", "retries", "search_window_days"],
       "properties": {
-        "headless": { "type": "boolean" },
-        "timeout_ms": { "type": "integer" },
-        "user_agent": { "type": "string" },
-        "retries": { "type": "integer" },
-        "search_window_days": { "type": "integer" },
-        "departure_date": { "type": "string" },
-        "max_offers_per_route": { "type": "integer" }
+        "headless": {
+          "type": "boolean",
+          "description": "Run browser in headless mode (default: true)",
+          "default": true
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "description": "Browser navigation timeout in milliseconds (default: 60000)",
+          "default": 60000,
+          "minimum": 10000,
+          "maximum": 300000
+        },
+        "user_agent": {
+          "type": "string",
+          "description": "Custom user agent string (optional)"
+        },
+        "retries": {
+          "type": "integer",
+          "description": "Number of retry attempts for failed API calls (default: 3)",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10
+        },
+        "search_window_days": {
+          "type": "integer",
+          "description": "Number of days ahead/behind to search (default: 60)",
+          "default": 60,
+          "minimum": 1,
+          "maximum": 365
+        },
+        "departure_date": {
+          "type": "string",
+          "description": "Override departure date (YYYY-MM-DD format). If empty, defaults to 7 days from now"
+        },
+        "max_offers_per_route": {
+          "type": "integer",
+          "description": "Maximum offers per route. 0 = no cap. Default 20 to avoid rate limits.",
+          "default": 20,
+          "minimum": 0,
+          "maximum": 1000
+        }
       }
     },
     "routes": {
       "type": "array",
+      "description": "List of flight routes to search",
+      "minItems": 1,
       "items": {
         "type": "object",
         "required": ["origin", "destination"],
         "properties": {
-          "origin": { "type": "string" },
-          "destination": { "type": "string" },
-          "programs": { "type": "array", "items": { "type": "string" } },
-          "active": { "type": "boolean" }
+          "origin": {
+            "type": "string",
+            "description": "Departure airport IATA code (3 letters uppercase)",
+            "pattern": "^[A-Z]{3}$",
+            "examples": ["YYZ", "JFK", "CDG", "LHR"]
+          },
+          "destination": {
+            "type": "string",
+            "description": "Arrival airport IATA code (3 letters uppercase)",
+            "pattern": "^[A-Z]{3}$",
+            "examples": ["CDG", "LHR", "NRT", "SYD"]
+          },
+          "programs": {
+            "type": "array",
+            "description": "Loyalty programs for this route. If empty, uses default_programs.",
+            "items": { "type": "string" }
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether to scrape this route (default: true)",
+            "default": true
+          }
         }
       }
     }
   }
 }
+

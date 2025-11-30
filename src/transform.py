@@ -1,3 +1,16 @@
+"""
+Data transformation and schema validation.
+
+This module normalizes raw scraped data and validates it against
+the JSON Schema data contract defined in config/data_contract.json.
+
+Core functionality:
+- Normalize field names, types, and values
+- Parse complex strings (prices, durations, etc.)
+- Validate against data contract
+- Log schema violations (warnings don't halt pipeline)
+"""
+
 import json
 import sys
 from pathlib import Path
@@ -10,12 +23,33 @@ CONTRACT_PATH = Path(__file__).resolve().parents[1] / "config" / "data_contract.
 logger = setup_logger(__name__)
 
 
-def _safe_get(d: Dict, key: str, default=None):
+def _safe_get(d: Dict, key: str, default=None) -> Any:
+    """
+    Safely get nested dict value with default.
+    
+    Args:
+        d (Dict): Dictionary to get value from
+        key (str): Key to retrieve
+        default: Value to return if key not found or d is not dict
+    
+    Returns:
+        Any: Value or default
+    """
     return d.get(key, default) if isinstance(d, dict) else default
 
 
 def _normalize_points(pricing: Dict[str, Any]) -> Dict[str, Any]:
-    """Ensure points fields are filled with sensible defaults."""
+    """
+    Ensure points fields are filled with sensible defaults.
+    
+    Parses points_price_raw if points_amount is missing.
+    
+    Args:
+        pricing (Dict[str, Any]): Pricing dict from scraped data
+    
+    Returns:
+        Dict[str, Any]: Normalized points with amount and currency
+    """
     points_raw = _safe_get(pricing, "points_price_raw")
     points_amount = _safe_get(pricing, "points_amount")
     points_curr = _safe_get(pricing, "points_program_currency")
@@ -31,7 +65,17 @@ def _normalize_points(pricing: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _normalize_cash(pricing: Dict[str, Any]) -> Dict[str, Any]:
-    cash_raw = _safe_get(pricing, "cash_copay_raw")
+    """
+    Normalize cash copay fields with defaults.
+    
+    Parses cash_copay_raw if cash_copay_amount is missing.
+    
+    Args:
+        pricing (Dict[str, Any]): Pricing dict from scraped data
+    
+    Returns:
+        Dict[str, Any]: Normalized cash with amount and currency
+    """
     cash_amount = _safe_get(pricing, "cash_copay_amount")
     cash_curr = _safe_get(pricing, "cash_copay_currency")
     if cash_amount is None and cash_raw:
@@ -46,7 +90,17 @@ def _normalize_cash(pricing: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _transform_record(rec: Dict[str, Any]) -> Dict[str, Any]:
-    pricing = _safe_get(rec, "pricing", {}) or {}
+    """
+    Transform and normalize a single flight record.
+    
+    Standardizes field names, normalizes data types, and normalizes nested structures.
+    
+    Args:
+        rec (Dict[str, Any]): Raw flight record from scraper
+    
+    Returns:
+        Dict[str, Any]: Normalized record matching data contract schema
+    """
     points = _normalize_points(pricing)
     cash = _normalize_cash(pricing)
 
@@ -100,8 +154,17 @@ def _transform_record(rec: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _validate_type(val, expected_types: List[str]) -> bool:
-    py_types = []
+def _validate_type(val: Any, expected_types: List[str]) -> bool:
+    """
+    Validate value against list of JSON Schema types.
+    
+    Args:
+        val (Any): Value to validate
+        expected_types (List[str]): JSON Schema type names (string, integer, null, etc.)
+    
+    Returns:
+        bool: True if value matches one of the expected types
+    """
     for t in expected_types:
         if t == "string":
             py_types.append(str)
@@ -116,9 +179,21 @@ def _validate_type(val, expected_types: List[str]) -> bool:
     return isinstance(val, tuple(py_types))
 
 
-def _validate_schema(data: Any, schema: Dict[str, Any], path: str = "root", errors: Optional[List[str]] = None):
-    if errors is None:
-        errors = []
+def _validate_schema(data: Any, schema: Dict[str, Any], path: str = "root", errors: Optional[List[str]] = None) -> List[str]:
+    """
+    Recursively validate data against JSON Schema.
+    
+    Custom implementation (not using jsonschema library) for control and error messages.
+    
+    Args:
+        data (Any): Data to validate
+        schema (Dict[str, Any]): JSON Schema
+        path (str): Current path in nested structure (for error messages)
+        errors (Optional[List[str]]): Accumulated error list
+    
+    Returns:
+        List[str]: List of validation errors (empty if valid)
+    """
     if not isinstance(schema, dict):
         return errors
 
@@ -157,7 +232,24 @@ def _validate_schema(data: Any, schema: Dict[str, Any], path: str = "root", erro
 
 
 def transform_run(input_path: Path, output_path: Optional[Path] = None) -> Path:
-    raw = json.loads(input_path.read_text(encoding="utf-8"))
+    """
+    Transform raw scraper output into normalized, validated format.
+    
+    Reads raw JSON from scraper, normalizes each record, validates against contract,
+    and saves transformed output.
+    
+    Args:
+        input_path (Path): Path to raw run_*.json file from scraper
+        output_path (Optional[Path]): Output path (auto-generated if None)
+    
+    Returns:
+        Path: Path to transformed output file
+    
+    Example:
+        >>> output = transform_run(Path("output/run_2025-11-30T09-02-51Z.json"))
+        >>> print(output)
+        Path('output/run_2025-11-30T09-02-51Z_transformed.json')
+    """
     # Load data contract (for reference/validation surfaces later)
     contract = {}
     try:

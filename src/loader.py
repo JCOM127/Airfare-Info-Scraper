@@ -1,3 +1,17 @@
+"""
+Data persistence and Google Drive integration.
+
+This module handles saving transformed data to local files and
+uploading to Google Drive with OAuth or Service Account authentication.
+
+Core functionality:
+- Local file persistence with timestamped filenames
+- OAuth authentication (personal Google accounts)
+- Service Account authentication (automated deployments)
+- Shared Drive support
+- Automatic token caching and refresh
+"""
+
 import os
 import time
 from pathlib import Path
@@ -17,11 +31,19 @@ SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 def _get_drive_service():
     """
-    Build a Drive client.
-    Priority:
-      1. OAuth client secrets (env GOOGLE_CLIENT_SECRETS). Token cached in
-         GOOGLE_TOKEN_FILE or ~/.cache/fly_tcoma_drive_token.json
-      2. Service account JSON via GDRIVE_SERVICE_ACCOUNT_FILE or GOOGLE_APPLICATION_CREDENTIALS.
+    Build an authenticated Google Drive API client.
+    
+    Attempts authentication in this priority:
+    1. OAuth (GOOGLE_CLIENT_SECRETS env var) - opens browser for auth
+    2. Service Account (GDRIVE_SERVICE_ACCOUNT_FILE or GOOGLE_APPLICATION_CREDENTIALS)
+    
+    Token from OAuth is cached in ~/.cache/fly_tcoma_drive_token.json for reuse.
+    
+    Returns:
+        googleapiclient.discovery.Resource: Authenticated Drive API service
+    
+    Raises:
+        FileNotFoundError: If neither OAuth secrets nor service account found
     """
     client_secrets = os.getenv("GOOGLE_CLIENT_SECRETS")
     if client_secrets:
@@ -55,12 +77,37 @@ def _get_drive_service():
 def upload_to_drive(file_path: str, folder_id: Optional[str] = None, drive_id: Optional[str] = None, max_retries: int = 3) -> str:
     """
     Upload a local file to Google Drive.
+    
+    Automatically selects OAuth or Service Account based on environment variables.
+    Supports both personal Drive and Shared Drives. Implements retry logic with
+    exponential backoff for transient errors.
+    
     Args:
-        file_path: local path to upload.
-        folder_id: optional Drive folder ID to place the file.
-        drive_id: optional Shared Drive ID (recommended to avoid SA quota issues).
+        file_path (str): Local file path to upload
+        folder_id (Optional[str]): Google Drive folder ID to place file in
+        drive_id (Optional[str]): Shared Drive ID (for Shared Drive uploads)
+        max_retries (int): Number of retry attempts (default: 3)
+    
     Returns:
-        The uploaded file ID.
+        str: Uploaded file ID in Google Drive
+    
+    Raises:
+        FileNotFoundError: If local file doesn't exist
+        HttpError: If Google Drive API call fails
+    
+    Environment Variables:
+        GOOGLE_CLIENT_SECRETS: Path to OAuth client secret JSON
+        GOOGLE_TOKEN_FILE: Path to cached OAuth token (default: ~/.cache/fly_tcoma_drive_token.json)
+        GDRIVE_SERVICE_ACCOUNT_FILE: Path to service account JSON
+        GOOGLE_APPLICATION_CREDENTIALS: Fallback for service account
+    
+    Example:
+        >>> file_id = upload_to_drive(
+        ...     'output/run_2025-11-30T09-02-51Z_transformed.json',
+        ...     folder_id='1abc123...',
+        ...     drive_id='0AK1234...'  # Optional, for Shared Drive
+        ... )
+        >>> print(f'File ID: {file_id}')
     """
     file_path = Path(file_path)
     if not file_path.exists():
