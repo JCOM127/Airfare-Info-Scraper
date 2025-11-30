@@ -2,6 +2,7 @@ import logging
 import sys
 import os
 from logging.handlers import RotatingFileHandler, SMTPHandler
+import json as _json
 
 def setup_logger(name: str) -> logging.Logger:
     """
@@ -21,7 +22,9 @@ def setup_logger(name: str) -> logging.Logger:
 
     # 2. Basic Configuration
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG) # Capture everything, filter in handlers
+    # Log level configurable via env
+    level = os.getenv("LOG_LEVEL", "INFO").upper()
+    logger.setLevel(getattr(logging, level, logging.INFO))
 
     # Prevent duplicate logs if function is called multiple times
     if logger.hasHandlers():
@@ -29,9 +32,24 @@ def setup_logger(name: str) -> logging.Logger:
 
     # 3. Formatter
     # Detailed format: Time - Level - Module - Message
-    formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(name)s - %(funcName)s - %(message)s'
-    )
+    log_format = os.getenv("LOG_FORMAT", "plain").lower()
+
+    if log_format == "json":
+        class JsonFormatter(logging.Formatter):
+            def format(self, record):
+                payload = {
+                    "time": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
+                    "level": record.levelname,
+                    "logger": record.name,
+                    "func": record.funcName,
+                    "message": record.getMessage(),
+                }
+                return _json.dumps(payload)
+        formatter = JsonFormatter()
+    else:
+        formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s - %(name)s - %(funcName)s - %(message)s'
+        )
 
     # 4. Console Handler (Standard Output)
     console_handler = logging.StreamHandler(sys.stdout)

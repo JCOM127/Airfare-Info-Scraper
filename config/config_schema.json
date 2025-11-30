@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SeatsAeroConfig",
+  "type": "object",
+  "required": ["project_name", "env", "default_programs", "scraping_settings", "routes"],
+  "properties": {
+    "project_name": { "type": "string" },
+    "env": { "type": "string" },
+    "default_programs": { "type": "array", "items": { "type": "string" } },
+    "scraping_settings": {
+      "type": "object",
+      "required": ["headless", "timeout_ms", "user_agent", "retries", "search_window_days", "departure_date", "max_offers_per_route"],
+      "properties": {
+        "headless": { "type": "boolean" },
+        "timeout_ms": { "type": "integer" },
+        "user_agent": { "type": "string" },
+        "retries": { "type": "integer" },
+        "search_window_days": { "type": "integer" },
+        "departure_date": { "type": "string" },
+        "max_offers_per_route": { "type": "integer" }
+      }
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["origin", "destination"],
+        "properties": {
+          "origin": { "type": "string" },
+          "destination": { "type": "string" },
+          "programs": { "type": "array", "items": { "type": "string" } },
+          "active": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

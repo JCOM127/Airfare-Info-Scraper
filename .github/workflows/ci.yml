@@ -18,6 +18,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           # Install playwright deps but skip browsers for speed (not needed for unit tests)
+      - name: Validate config schema
+        run: |
+          python - <<'PY'
+import json, jsonschema
+raw = json.load(open("config/config.json"))
+schema = json.load(open("config/config_schema.json"))
+jsonschema.validate(raw, schema)
+print("config.json validated against config_schema.json")
+PY
       - name: Run tests
         run: |
           python -m pytest

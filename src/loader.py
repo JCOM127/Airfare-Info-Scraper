@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -7,6 +8,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from googleapiclient.errors import HttpError
 
 
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
@@ -46,7 +48,7 @@ def _get_drive_service():
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
-def upload_to_drive(file_path: str, folder_id: Optional[str] = None, drive_id: Optional[str] = None) -> str:
+def upload_to_drive(file_path: str, folder_id: Optional[str] = None, drive_id: Optional[str] = None, max_retries: int = 3) -> str:
     """
     Upload a local file to Google Drive.
     Args:
@@ -71,9 +73,22 @@ def upload_to_drive(file_path: str, folder_id: Optional[str] = None, drive_id: O
         extra_kwargs["includeItemsFromAllDrives"] = True
 
     media = MediaFileUpload(str(file_path), resumable=True)
-    uploaded = (
-        service.files()
-        .create(body=metadata, media_body=media, fields="id", **extra_kwargs)
-        .execute()
-    )
-    return uploaded.get("id")
+    backoff = 1.0
+    for attempt in range(max_retries):
+        try:
+            uploaded = (
+                service.files()
+                .create(body=metadata, media_body=media, fields="id", **extra_kwargs)
+                .execute()
+            )
+            return uploaded.get("id")
+        except HttpError as e:
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(backoff)
+            backoff *= 2
+        except Exception:
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(backoff)
+            backoff *= 2
