@@ -1,0 +1,26 @@
+{
+  "project_name": "Fly Tcoma Flight Reward Data Scraper",
+  "env": "production",
+  "default_programs": [
+    "Smiles",
+    "Virgin",
+    "American",
+    "Alaska"
+  ],
+  "scraping_settings": {
+    "headless": true,
+    "timeout_ms": 60000,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "retries": 3
+  },
+  "routes": [
+    { "origin": "LHR", "destination": "DFW" },
+    { "origin": "LHR", "destination": "LAX" },
+    { "origin": "LHR", "destination": "ORD" },
+    { "origin": "LHR", "destination": "PHL" },
+    { "origin": "DFW", "destination": "LHR" },
+    { "origin": "LAX", "destination": "LHR" },
+    { "origin": "ORD", "destination": "LHR" },
+    { "origin": "PHL", "destination": "LHR" }
+  ]
+}
