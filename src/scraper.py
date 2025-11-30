@@ -1,6 +1,8 @@
 import asyncio
 import sys
 import json
+import random
+import random
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List
 
@@ -46,39 +48,69 @@ class SeatsAeroScraper:
         except Exception:
             return self.run_timestamp
 
+    def _build_minimal_record(self, meta: Dict, target_date: str):
+        """Fallback record when enrichment fails (captures top-level fields only)."""
+        return {
+            "inputs_from": meta.get("oa"),
+            "inputs_to": meta.get("da"),
+            "program": meta.get("source"),
+            "departure_date": meta.get("date") or target_date,
+            "duration": None,
+            "class": None,
+            "stops": meta.get("stops"),
+            "flight_number": None,
+            "last_updated": self.run_timestamp,
+            "legs": [],
+            "pricing": {
+                "points_price_raw": None,
+                "points_amount": None,
+                "points_program_currency": meta.get("source"),
+                "cash_copay_raw": None,
+                "cash_copay_amount": None,
+                "cash_copay_currency": None,
+                "cents_per_point": None,
+                "total_value_usd": None,
+            },
+        }
+
     async def _page_fetch_json(self, page, url: str, params: Dict):
         payload = {
             "url": url,
             "params": params,
             "timeout": self.config.scraping_settings.timeout_ms,
         }
-        result = await page.evaluate(
-            """
-            async ({url, params, timeout}) => {
-              const q = new URL(url);
-              Object.entries(params).forEach(([k,v]) => q.searchParams.set(k, String(v)));
-              const ctrl = new AbortController();
-              const t = setTimeout(() => ctrl.abort(), timeout);
-              try {
-                const res = await fetch(q.toString(), {
-                  method: 'GET',
-                  headers: {
-                    'accept': 'application/json',
-                  },
-                  signal: ctrl.signal,
-                });
-                const text = await res.text();
-                return { ok: res.ok, status: res.status, text };
-              } finally {
-                clearTimeout(t);
-              }
-            }
-            """,
-            payload,
-        )
-        if not result["ok"]:
+
+        attempts = self.config.scraping_settings.retries
+        for attempt in range(attempts):
+            result = await page.evaluate(
+                """
+                async ({url, params, timeout}) => {
+                  const q = new URL(url);
+                  Object.entries(params).forEach(([k,v]) => q.searchParams.set(k, String(v)));
+                  const ctrl = new AbortController();
+                  const t = setTimeout(() => ctrl.abort(), timeout);
+                  try {
+                    const res = await fetch(q.toString(), {
+                      method: 'GET',
+                      headers: { 'accept': 'application/json' },
+                      signal: ctrl.signal,
+                    });
+                    const text = await res.text();
+                    return { ok: res.ok, status: res.status, text };
+                  } finally {
+                    clearTimeout(t);
+                  }
+                }
+                """,
+                payload,
+            )
+            if result["ok"]:
+                return json.loads(result["text"])
+            if result["status"] == 429 and attempt < attempts - 1:
+                # Back off more aggressively on rate limits
+                await asyncio.sleep((1.0 + random.uniform(0, 1.0)) * (attempt + 1))
+                continue
             raise Exception(f"fetch {url} returned {result['status']}")
-        return json.loads(result["text"])
 
     async def _fetch_search(self, page, route: RouteConfig, target_date: str):
         params = {
@@ -215,12 +247,17 @@ class SeatsAeroScraper:
 
             for route in self.config.routes:
                 fetched = False
+                route_429_hits = 0
                 for attempt in range(self.config.scraping_settings.retries):
                     try:
                         metadata = await self._fetch_search(page, route, target_date)
+                        max_offers = self.config.scraping_settings.max_offers_per_route
+                        if max_offers and max_offers > 0:
+                            metadata = metadata[:max_offers]
                         logger.info(f"{route.origin}-{route.destination}: fetched {len(metadata)} offers")
                         fetched = True
                         added = 0
+                        skip_route = False
                         for meta in metadata:
                             if not self._program_matches(meta.get("source", ""), route.programs):
                                 continue
@@ -230,17 +267,33 @@ class SeatsAeroScraper:
                                     for record in self._build_records(meta, detail):
                                         self.output_schema["origin_dest_pairs"].append(record)
                                         added += 1
+                                    # Small delay between enrichments to avoid 429
+                                    await asyncio.sleep(0.5 + random.uniform(0, 0.5))
                                     break
                                 except Exception as e:
                                     if attempt_enrich == self.config.scraping_settings.retries - 1:
                                         logger.warning(f"Enrichment failed for {meta.get('id')}: {e}")
-                                    await asyncio.sleep(0.5)
+                                        if "429" in str(e):
+                                            route_429_hits += 1
+                                            if route_429_hits >= 2:
+                                                logger.warning(f"{route.origin}-{route.destination}: hit 429 twice, skipping remaining offers")
+                                                skip_route = True
+                                                break
+                                        # Fallback: append minimal record when enrichment fails
+                                        fallback = self._build_minimal_record(meta, target_date)
+                                        self.output_schema["origin_dest_pairs"].append(fallback)
+                                        added += 1
+                                    await asyncio.sleep((0.75 + random.uniform(0, 0.75)) * (attempt_enrich + 1))
+                            if skip_route:
+                                break
                         logger.info(f"{route.origin}-{route.destination}: appended {added} records")
                         break
                     except Exception as e:
                         if attempt == self.config.scraping_settings.retries - 1:
                             logger.error(f"Route fetch failed for {route.origin}-{route.destination}: {e}")
-                        await asyncio.sleep(0.5)
+                        await asyncio.sleep(0.5 + random.uniform(0, 0.5))
+            # Pause between routes to reduce rate hits
+            await asyncio.sleep(2.0 + random.uniform(0, 1.0))
 
         safe_ts = self.run_timestamp.replace(":", "-")
         filename = f"output/run_{safe_ts}.json"
