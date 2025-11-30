@@ -17,7 +17,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # Install playwright deps but skip browsers for speed (not needed for unit tests)
       - name: Validate config schema
         run: |
           python - <<'PY'
