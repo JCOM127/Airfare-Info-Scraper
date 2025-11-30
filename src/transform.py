@@ -50,6 +50,19 @@ def _transform_record(rec: Dict[str, Any]) -> Dict[str, Any]:
     points = _normalize_points(pricing)
     cash = _normalize_cash(pricing)
 
+    def _format_duration(val):
+        if val is None:
+            return None
+        if isinstance(val, (int, float)):
+            try:
+                minutes_val = int(val)
+                hours = minutes_val // 60
+                minutes = minutes_val % 60
+                return f"{hours}h {minutes}m"
+            except Exception:
+                return str(val)
+        return str(val)
+
     legs_out: List[Dict[str, Optional[Any]]] = []
     for leg in _safe_get(rec, "legs", []) or []:
         legs_out.append(
@@ -68,7 +81,7 @@ def _transform_record(rec: Dict[str, Any]) -> Dict[str, Any]:
         "inputs_to": rec.get("inputs_to"),
         "program": rec.get("program"),
         "departure_date": rec.get("departure_date"),
-        "duration": rec.get("duration"),
+        "duration": _format_duration(rec.get("duration")),
         "class": rec.get("class"),
         "stops": rec.get("stops"),
         "flight_number": rec.get("flight_number"),
