@@ -55,3 +55,7 @@ Tests cover parsing helpers, transform + schema validation, and config load.
 - Transform: normalization + schema validation against `config/data_contract.json`; logs mismatches.
 - Load: Google Drive uploader with OAuth or service account + Shared Drive.
 - Logging: route-level counts, transform summaries; adjust in `src/logger.py`.
+- Contract: defined as JSON Schema in `config/data_contract.json` and enforced during transform (warnings logged with counts).
+
+### CI
+- GitHub Actions workflow (`.github/workflows/ci.yml`) runs pytest on push/PR.

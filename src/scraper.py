@@ -247,7 +247,7 @@ class SeatsAeroScraper:
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(self.output_schema, f, indent=2)
 
-        logger.info(f"Run Complete. Saved to {filename}")
+        logger.info(f"Run Complete. Saved to {filename} | total_records={len(self.output_schema['origin_dest_pairs'])}")
         await browser.close()
         return self.output_schema
 

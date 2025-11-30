@@ -184,7 +184,7 @@ def transform_run(input_path: Path, output_path: Optional[Path] = None) -> Path:
         stem = input_path.stem + "_transformed"
         output_path = input_path.with_name(f"{stem}{input_path.suffix}")
     output_path.write_text(json.dumps(cleaned, indent=2), encoding="utf-8")
-    logger.info(f"Transformed {len(cleaned['flights'])} flight record(s) from {input_path} into {output_path}")
+    logger.info(f"Transformed {len(cleaned['flights'])} flight record(s) from {input_path} into {output_path} | validation_errors={len(errors) if contract else 0}")
     return output_path
 
 
