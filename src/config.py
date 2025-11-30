@@ -65,7 +65,7 @@ class ConfigLoader:
             # Robust .get() to avoid KeyErrors
             search_window_days=s_data.get("search_window_days", 60),
             departure_date=s_data.get("departure_date", ""),
-            max_offers_per_route=s_data.get("max_offers_per_route", 0)
+            max_offers_per_route=s_data.get("max_offers_per_route", 0),
         )
 
         routes = []

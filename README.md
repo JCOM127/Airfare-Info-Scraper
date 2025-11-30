@@ -9,6 +9,7 @@ Pipeline to fetch Seats.aero availability, normalize to a data contract, and opt
 
 ### Config
 - Edit `config/config.json` for routes, programs, search window, departure date.
+- `max_offers_per_route` caps per-route enrichment load (default 20 to reduce 429s).
 - Data contract lives in `config/data_contract.json` (JSON Schema).
 
 ### Run scraper (E)

@@ -268,7 +268,7 @@ class SeatsAeroScraper:
                                         self.output_schema["origin_dest_pairs"].append(record)
                                         added += 1
                                     # Small delay between enrichments to avoid 429
-                                    await asyncio.sleep(0.5 + random.uniform(0, 0.5))
+                                    await asyncio.sleep(1.0 + random.uniform(0.5, 1.0))
                                     break
                                 except Exception as e:
                                     if attempt_enrich == self.config.scraping_settings.retries - 1:
@@ -294,6 +294,8 @@ class SeatsAeroScraper:
                         await asyncio.sleep(0.5 + random.uniform(0, 0.5))
             # Pause between routes to reduce rate hits
             await asyncio.sleep(2.0 + random.uniform(0, 1.0))
+            # Process one route per execution window
+            break
 
         safe_ts = self.run_timestamp.replace(":", "-")
         filename = f"output/run_{safe_ts}.json"
