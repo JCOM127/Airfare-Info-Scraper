@@ -148,3 +148,4 @@ def get_config(path: str = "config/config.json") -> AppConfig:
         >>> print(config.env)
         'dev'
     """
+    return ConfigLoader.load_config(path)

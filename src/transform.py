@@ -76,6 +76,7 @@ def _normalize_cash(pricing: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: Normalized cash with amount and currency
     """
+    cash_raw = _safe_get(pricing, "cash_copay_raw")
     cash_amount = _safe_get(pricing, "cash_copay_amount")
     cash_curr = _safe_get(pricing, "cash_copay_currency")
     if cash_amount is None and cash_raw:
@@ -101,6 +102,8 @@ def _transform_record(rec: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: Normalized record matching data contract schema
     """
+    # Extract pricing dict from record
+    pricing = _safe_get(rec, "pricing", {}) or {}
     points = _normalize_points(pricing)
     cash = _normalize_cash(pricing)
 
@@ -165,6 +168,7 @@ def _validate_type(val: Any, expected_types: List[str]) -> bool:
     Returns:
         bool: True if value matches one of the expected types
     """
+    py_types = []
     for t in expected_types:
         if t == "string":
             py_types.append(str)
@@ -250,6 +254,9 @@ def transform_run(input_path: Path, output_path: Optional[Path] = None) -> Path:
         >>> print(output)
         Path('output/run_2025-11-30T09-02-51Z_transformed.json')
     """
+    # Load raw JSON from input file
+    raw = json.loads(input_path.read_text(encoding="utf-8"))
+    
     # Load data contract (for reference/validation surfaces later)
     contract = {}
     try:
