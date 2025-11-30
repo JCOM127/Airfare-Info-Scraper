@@ -1,0 +1,27 @@
+{
+  "run_timestamp_utc": "2025-11-30T22:21:58Z",
+  "origin_dest_pairs": [
+    {
+      "inputs_from": "LHR",
+      "inputs_to": "DFW",
+      "program": "smiles",
+      "departure_date": "2025-12-01",
+      "duration": null,
+      "class": null,
+      "stops": 0,
+      "flight_number": null,
+      "last_updated": "2025-11-30T22:21:58Z",
+      "legs": [],
+      "pricing": {
+        "points_price_raw": null,
+        "points_amount": null,
+        "points_program_currency": "smiles",
+        "cash_copay_raw": null,
+        "cash_copay_amount": null,
+        "cash_copay_currency": null,
+        "cents_per_point": null,
+        "total_value_usd": null
+      }
+    }
+  ]
+}
