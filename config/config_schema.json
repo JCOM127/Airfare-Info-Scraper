@@ -9,7 +9,7 @@
     "default_programs": { "type": "array", "items": { "type": "string" } },
     "scraping_settings": {
       "type": "object",
-      "required": ["headless", "timeout_ms", "user_agent", "retries", "search_window_days", "departure_date", "max_offers_per_route", "proxy"],
+      "required": ["headless", "timeout_ms", "user_agent", "retries", "search_window_days", "departure_date", "max_offers_per_route"],
       "properties": {
         "headless": { "type": "boolean" },
         "timeout_ms": { "type": "integer" },

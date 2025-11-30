@@ -5,6 +5,7 @@ from typing import Optional
 
 from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -31,12 +32,15 @@ def _get_drive_service():
             creds = Credentials.from_authorized_user_file(str(token_file), SCOPES)
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(request=None)  # google-auth handles refresh internally
-            else:
+                try:
+                    creds.refresh(Request())
+                except Exception:
+                    creds = None
+            if not creds or not creds.valid:
                 flow = InstalledAppFlow.from_client_secrets_file(client_secrets, SCOPES)
                 creds = flow.run_local_server(port=0)
-            token_file.parent.mkdir(parents=True, exist_ok=True)
-            token_file.write_text(creds.to_json())
+                token_file.parent.mkdir(parents=True, exist_ok=True)
+                token_file.write_text(creds.to_json())
         return build("drive", "v3", credentials=creds, cache_discovery=False)
 
     cred_path = os.getenv("GDRIVE_SERVICE_ACCOUNT_FILE") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")

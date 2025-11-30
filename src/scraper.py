@@ -248,6 +248,7 @@ class SeatsAeroScraper:
             for route in self.config.routes:
                 fetched = False
                 route_429_hits = 0
+                skip_rest = False
                 for attempt in range(self.config.scraping_settings.retries):
                     try:
                         metadata = await self._fetch_search(page, route, target_date)
@@ -257,8 +258,14 @@ class SeatsAeroScraper:
                         logger.info(f"{route.origin}-{route.destination}: fetched {len(metadata)} offers")
                         fetched = True
                         added = 0
-                        skip_route = False
                         for meta in metadata:
+                            if skip_rest:
+                                # If we've hit too many 429s, just append minimal records for the remaining offers
+                                fallback = self._build_minimal_record(meta, target_date)
+                                self.output_schema["origin_dest_pairs"].append(fallback)
+                                added += 1
+                                continue
+
                             if not self._program_matches(meta.get("source", ""), route.programs):
                                 continue
                             for attempt_enrich in range(self.config.scraping_settings.retries):
@@ -276,26 +283,21 @@ class SeatsAeroScraper:
                                         if "429" in str(e):
                                             route_429_hits += 1
                                             if route_429_hits >= 2:
-                                                logger.warning(f"{route.origin}-{route.destination}: hit 429 twice, skipping remaining offers")
-                                                skip_route = True
-                                                break
+                                                logger.warning(f"{route.origin}-{route.destination}: 429 threshold hit; skipping remaining enrichments with minimal records")
+                                                skip_rest = True
                                         # Fallback: append minimal record when enrichment fails
                                         fallback = self._build_minimal_record(meta, target_date)
                                         self.output_schema["origin_dest_pairs"].append(fallback)
                                         added += 1
                                     await asyncio.sleep((0.75 + random.uniform(0, 0.75)) * (attempt_enrich + 1))
-                            if skip_route:
-                                break
                         logger.info(f"{route.origin}-{route.destination}: appended {added} records")
                         break
                     except Exception as e:
                         if attempt == self.config.scraping_settings.retries - 1:
                             logger.error(f"Route fetch failed for {route.origin}-{route.destination}: {e}")
                         await asyncio.sleep(0.5 + random.uniform(0, 0.5))
-            # Pause between routes to reduce rate hits
-            await asyncio.sleep(2.0 + random.uniform(0, 1.0))
-            # Process one route per execution window
-            break
+                # Pause between routes to reduce rate hits
+                await asyncio.sleep(2.0 + random.uniform(0, 1.0))
 
         safe_ts = self.run_timestamp.replace(":", "-")
         filename = f"output/run_{safe_ts}.json"
