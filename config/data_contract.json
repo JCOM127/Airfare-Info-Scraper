@@ -1,36 +1,84 @@
 {
-  "run_timestamp_utc": "string (ISO-8601, UTC)",
-  "flights": [
-    {
-      "inputs_from": "string (IATA)",
-      "inputs_to": "string (IATA)",
-      "program": "string",
-      "departure_date": "string (YYYY-MM-DD)",
-      "duration": "string (e.g., \"23h 55m\") or null",
-      "class": "string (Economy|Premium|Business|First|etc.) or null",
-      "stops": "integer or null",
-      "flight_number": "string (e.g., \"AA142\") or null",
-      "last_updated": "string (ISO-8601 UTC) or null",
-      "legs": [
-        {
-          "leg_departure_datetime": "string (ISO-8601) or null",
-          "leg_arrival_datetime": "string (ISO-8601) or null",
-          "leg_flight_number": "string or null",
-          "leg_distance": "number (miles) or null",
-          "leg_airplane": "string or null",
-          "leg_class": "string or null"
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SeatsAeroFlightRun",
+  "type": "object",
+  "required": ["run_timestamp_utc", "flights"],
+  "properties": {
+    "run_timestamp_utc": { "type": ["string", "null"], "format": "date-time" },
+    "flights": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "inputs_from",
+          "inputs_to",
+          "program",
+          "departure_date",
+          "duration",
+          "class",
+          "stops",
+          "flight_number",
+          "last_updated",
+          "legs",
+          "pricing"
+        ],
+        "properties": {
+          "inputs_from": { "type": ["string", "null"] },
+          "inputs_to": { "type": ["string", "null"] },
+          "program": { "type": ["string", "null"] },
+          "departure_date": { "type": ["string", "null"], "format": "date" },
+          "duration": { "type": ["string", "null"] },
+          "class": { "type": ["string", "null"] },
+          "stops": { "type": ["integer", "null"] },
+          "flight_number": { "type": ["string", "null"] },
+          "last_updated": { "type": ["string", "null"], "format": "date-time" },
+          "legs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "leg_departure_datetime",
+                "leg_arrival_datetime",
+                "leg_flight_number",
+                "leg_distance",
+                "leg_airplane",
+                "leg_class"
+              ],
+              "properties": {
+                "leg_departure_datetime": { "type": ["string", "null"] },
+                "leg_arrival_datetime": { "type": ["string", "null"] },
+                "leg_flight_number": { "type": ["string", "null"] },
+                "leg_distance": { "type": ["number", "integer", "null"] },
+                "leg_airplane": { "type": ["string", "null"] },
+                "leg_class": { "type": ["string", "null"] }
+              }
+            }
+          },
+          "pricing": {
+            "type": "object",
+            "required": [
+              "points_price_raw",
+              "points_amount",
+              "points_program_currency",
+              "cash_copay_raw",
+              "cash_copay_amount",
+              "cash_copay_currency",
+              "cents_per_point",
+              "total_value_usd"
+            ],
+            "properties": {
+              "points_price_raw": { "type": ["string", "null"] },
+              "points_amount": { "type": ["number", "integer", "null"] },
+              "points_program_currency": { "type": ["string", "null"] },
+              "cash_copay_raw": { "type": ["string", "null"] },
+              "cash_copay_amount": { "type": ["number", "integer", "null"] },
+              "cash_copay_currency": { "type": ["string", "null"] },
+              "cents_per_point": { "type": ["number", "integer", "null"] },
+              "total_value_usd": { "type": ["number", "integer", "null"] }
+            }
+          }
         }
-      ],
-      "pricing": {
-        "points_price_raw": "string or null",
-        "points_amount": "number or null",
-        "points_program_currency": "string or null",
-        "cash_copay_raw": "string or null",
-        "cash_copay_amount": "number or null",
-        "cash_copay_currency": "string or null",
-        "cents_per_point": "number or null",
-        "total_value_usd": "number or null"
       }
     }
-  ]
+  }
 }

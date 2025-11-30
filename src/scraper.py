@@ -220,6 +220,7 @@ class SeatsAeroScraper:
                         metadata = await self._fetch_search(page, route, target_date)
                         logger.info(f"{route.origin}-{route.destination}: fetched {len(metadata)} offers")
                         fetched = True
+                        added = 0
                         for meta in metadata:
                             if not self._program_matches(meta.get("source", ""), route.programs):
                                 continue
@@ -228,11 +229,13 @@ class SeatsAeroScraper:
                                     detail = await self._fetch_enrichment(page, meta["id"], route, target_date)
                                     for record in self._build_records(meta, detail):
                                         self.output_schema["origin_dest_pairs"].append(record)
+                                        added += 1
                                     break
                                 except Exception as e:
                                     if attempt_enrich == self.config.scraping_settings.retries - 1:
                                         logger.warning(f"Enrichment failed for {meta.get('id')}: {e}")
                                     await asyncio.sleep(0.5)
+                        logger.info(f"{route.origin}-{route.destination}: appended {added} records")
                         break
                     except Exception as e:
                         if attempt == self.config.scraping_settings.retries - 1:

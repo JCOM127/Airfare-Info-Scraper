@@ -4,8 +4,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from src.utils import DataParser
+from src.logger import setup_logger
 
 CONTRACT_PATH = Path(__file__).resolve().parents[1] / "config" / "data_contract.json"
+logger = setup_logger(__name__)
 
 
 def _safe_get(d: Dict, key: str, default=None):
@@ -85,6 +87,62 @@ def _transform_record(rec: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _validate_type(val, expected_types: List[str]) -> bool:
+    py_types = []
+    for t in expected_types:
+        if t == "string":
+            py_types.append(str)
+        elif t == "integer":
+            py_types.append(int)
+        elif t == "number":
+            py_types.append((int, float))
+        elif t == "null":
+            if val is None:
+                return True
+            continue
+    return isinstance(val, tuple(py_types))
+
+
+def _validate_schema(data: Any, schema: Dict[str, Any], path: str = "root", errors: Optional[List[str]] = None):
+    if errors is None:
+        errors = []
+    if not isinstance(schema, dict):
+        return errors
+
+    expected_type = schema.get("type")
+    if expected_type:
+        types_list = expected_type if isinstance(expected_type, list) else [expected_type]
+        if "null" in types_list and data is None:
+            pass
+        elif "object" in types_list and isinstance(data, dict):
+            pass
+        elif "array" in types_list and isinstance(data, list):
+            pass
+        elif any(t in ["string", "number", "integer"] for t in types_list):
+            if not _validate_type(data, types_list):
+                errors.append(f"{path}: expected {types_list}, got {type(data).__name__}")
+                return errors
+        elif not isinstance(data, dict) and not isinstance(data, list):
+            errors.append(f"{path}: expected {types_list}, got {type(data).__name__}")
+            return errors
+
+    if isinstance(data, dict):
+        required = schema.get("required", [])
+        props = schema.get("properties", {})
+        for req in required:
+            if req not in data:
+                errors.append(f"{path}: missing required key '{req}'")
+        for key, subschema in props.items():
+            if key in data:
+                _validate_schema(data[key], subschema, f"{path}.{key}", errors)
+    elif isinstance(data, list):
+        item_schema = schema.get("items")
+        if item_schema:
+            for idx, item in enumerate(data):
+                _validate_schema(item, item_schema, f"{path}[{idx}]", errors)
+    return errors
+
+
 def transform_run(input_path: Path, output_path: Optional[Path] = None) -> Path:
     raw = json.loads(input_path.read_text(encoding="utf-8"))
     # Load data contract (for reference/validation surfaces later)
@@ -101,10 +159,19 @@ def transform_run(input_path: Path, output_path: Optional[Path] = None) -> Path:
     for rec in raw.get("origin_dest_pairs", []):
         cleaned["flights"].append(_transform_record(rec))
 
+    # Validate against contract if present
+    if contract:
+        errors = _validate_schema(cleaned, contract, "root", [])
+        if errors:
+            logger.warning(f"Schema validation reported {len(errors)} issue(s):")
+            for e in errors:
+                logger.warning(f" - {e}")
+
     if output_path is None:
         stem = input_path.stem + "_transformed"
         output_path = input_path.with_name(f"{stem}{input_path.suffix}")
     output_path.write_text(json.dumps(cleaned, indent=2), encoding="utf-8")
+    logger.info(f"Transformed {len(cleaned['flights'])} flight record(s) from {input_path} into {output_path}")
     return output_path
 
 
