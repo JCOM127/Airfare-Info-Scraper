@@ -172,6 +172,7 @@ class SeatsAeroScraper:
         Raises:
             Exception: If fetch fails after all retries
         """
+        payload = {
             "url": url,
             "params": params,
             "timeout": self.config.scraping_settings.timeout_ms,
@@ -223,6 +224,7 @@ class SeatsAeroScraper:
         Returns:
             List[Dict]: Metadata array of available offers
         """
+        params = {
             "min_seats": 1,
             "applicable_cabin": "any",
             "additional_days": "true",
@@ -254,6 +256,7 @@ class SeatsAeroScraper:
         Returns:
             Dict: Enriched offer details with trip information
         """
+        params = {
             "m": 1,
             "min_seats": 1,
             "applicable_cabin": "any",
@@ -285,6 +288,7 @@ class SeatsAeroScraper:
         date = meta.get("date") or detail.get("departureDate")
         dep_air = detail.get("originAirport") or meta.get("oa")
         arr_air = detail.get("destinationAirport") or meta.get("da")
+        program = meta.get("Program")
         trips = detail.get("trips", [])
         records = []
         last_updated_minutes = detail.get("lastUpdatedMinutes")
